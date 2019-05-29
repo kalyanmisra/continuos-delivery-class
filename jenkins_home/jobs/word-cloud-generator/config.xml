@@ -1,0 +1,99 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.27.0">
+      <projectUrl>https://github.com/wickett/word-cloud-generator/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@3.3.2">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>https://github.com/wickett/word-cloud-generator.git</url>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>*/master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions>
+      <hudson.plugins.git.extensions.impl.RelativeTargetDirectory>
+        <relativeTargetDir>src/github.com/wickett/word-cloud-generator</relativeTargetDir>
+      </hudson.plugins.git.extensions.impl.RelativeTargetDirectory>
+    </extensions>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <hudson.triggers.SCMTrigger>
+      <spec>H/15 * * * *</spec>
+      <ignorePostCommitHooks>false</ignorePostCommitHooks>
+    </hudson.triggers.SCMTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>export GOPATH=$WORKSPACE
+cd src/github.com/wickett/word-cloud-generator
+cat Makefile
+export PATH=$PATH:$(go env GOPATH)/bin
+go get ./...
+go get github.com/tools/godep
+go get github.com/GeertJohan/go.rice/rice
+sed -i &quot;s/1.DEVELOPMENT/1.$BUILD_NUMBER/g&quot; ./static/version
+make rice
+make
+md5sum artifacts/*/word-cloud-generator
+cd artifacts/linux
+gzip word-cloud-generator
+ls -l</command>
+    </hudson.tasks.Shell>
+    <sp.sd.nexusartifactuploader.NexusArtifactUploader plugin="nexus-artifact-uploader@2.9">
+      <nexusVersion>nexus3</nexusVersion>
+      <protocol>http</protocol>
+      <nexusUrl>nexus:8081</nexusUrl>
+      <groupId>cd_class</groupId>
+      <version>1.$BUILD_NUMBER</version>
+      <repository>word-cloud-generator</repository>
+      <artifacts>
+        <sp.sd.nexusartifactuploader.Artifact>
+          <artifactId>word-cloud-generator</artifactId>
+          <type>gz</type>
+          <classifier></classifier>
+          <file>src/github.com/wickett/word-cloud-generator/artifacts/linux/word-cloud-generator.gz</file>
+        </sp.sd.nexusartifactuploader.Artifact>
+      </artifacts>
+      <credentialsId>nexusadmin</credentialsId>
+    </sp.sd.nexusartifactuploader.NexusArtifactUploader>
+    <org.jvnet.hudson.plugins.SSHBuilder plugin="ssh@2.5">
+      <siteName>root@test_fixture:22</siteName>
+      <command>cd /chef-repo; sed &quot;s/1.DEVELOPMENT/1.$BUILD_NUMBER/g&quot; word-cloud-generator.json.template &gt; word-cloud-generator.json; chef-solo -c solo.rb -j word-cloud-generator.json</command>
+      <execEachLine>false</execEachLine>
+    </org.jvnet.hudson.plugins.SSHBuilder>
+    <hudson.tasks.Shell>
+      <command>docker run -v continuousdeliveryclass_ramlfiles:/raml --net=&quot;host&quot; --rm abao wordcloud.raml --server http://localhost:8888</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers>
+    <hudson.plugins.build__timeout.BuildTimeoutWrapper plugin="build-timeout@1.18">
+      <strategy class="hudson.plugins.build_timeout.impl.AbsoluteTimeOutStrategy">
+        <timeoutMinutes>5</timeoutMinutes>
+      </strategy>
+      <operationList/>
+    </hudson.plugins.build__timeout.BuildTimeoutWrapper>
+    <hudson.plugins.timestamper.TimestamperBuildWrapper plugin="timestamper@1.8.8"/>
+    <org.jenkinsci.plugins.golang.GolangBuildWrapper plugin="golang@1.2">
+      <goVersion>go 1.8.3</goVersion>
+    </org.jenkinsci.plugins.golang.GolangBuildWrapper>
+  </buildWrappers>
+</project>
